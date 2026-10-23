@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Creepster&family=IM+Fell+English:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" onerror="this.onerror=null;this.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'">
 <style>
   :root{
     --bg:#0b0a0f;
@@ -74,7 +74,8 @@
   .item .tag{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent-2)}
   .item p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.4}
 
-  #map{flex:1;min-width:0;background:#08070b}
+  #map{flex:1;min-width:0;min-height:300px;background:#08070b}
+  #map.dim-tiles .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9)}
 
   /* story drawer */
   #story{
@@ -188,6 +189,10 @@
 <footer>Folklore is folklore — many stories here are unverified local legend. Visit businesses during open hours, respect private property, and never trespass at night.</footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  // Backup copy of the map library if the first CDN is blocked
+  if (!window.L) document.write('<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>');
+</script>
 <script>
 /* ---------------------------------------------------------------
    LOCATIONS — edit, add or remove entries here.
@@ -419,13 +424,37 @@ const PLACES = [
 ];
 
 /* ---------------- map ---------------- */
+if (!window.L) {
+  document.getElementById('map').innerHTML = '<div style="padding:40px;text-align:center;color:#a39d91">The map library couldn\'t load. Check your connection or open this page from its live web address.</div>';
+  throw new Error('Leaflet failed to load');
+}
 const CENTER = [42.022, -89.318];
 const map = L.map('map', { zoomControl: true, scrollWheelZoom: true }).setView(CENTER, 13);
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-  subdomains: 'abcd', maxZoom: 19
-}).addTo(map);
+/* Free map tiles — no API key needed. If one server fails, the next is tried automatically. */
+const OSM = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+const TILE_SOURCES = [
+  { url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', opt:{ subdomains:'abcd', maxZoom:19, attribution: OSM + ' &copy; <a href="https://carto.com/">CARTO</a>' } },
+  { url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png', opt:{ maxZoom:19, attribution: OSM }, dim:true },
+  { url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', opt:{ maxZoom:19, attribution:'Tiles &copy; Esri' }, dim:true }
+];
+let tileIdx = 0, tileLayer = null, tileErrors = 0, tileLoaded = false;
+function useTiles(i){
+  if (tileLayer) map.removeLayer(tileLayer);
+  tileIdx = i; tileErrors = 0; tileLoaded = false;
+  const src = TILE_SOURCES[i];
+  document.getElementById('map').classList.toggle('dim-tiles', !!src.dim);
+  tileLayer = L.tileLayer(src.url, src.opt)
+    .on('tileload', () => { tileLoaded = true; })
+    .on('tileerror', () => {
+      tileErrors++;
+      if (!tileLoaded && tileErrors >= 4 && tileIdx < TILE_SOURCES.length - 1) useTiles(tileIdx + 1);
+    })
+    .addTo(map);
+}
+useTiles(0);
+window.addEventListener('load', () => map.invalidateSize());
+window.addEventListener('resize', () => map.invalidateSize());
 
 const markers = {};
 let current = -1;
