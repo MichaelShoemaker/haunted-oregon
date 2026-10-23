@@ -434,7 +434,6 @@ const map = L.map('map', { zoomControl: true, scrollWheelZoom: true }).setView(C
 /* Free map tiles — no API key needed. If one server fails, the next is tried automatically. */
 const OSM = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 const TILE_SOURCES = [
-  { url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', opt:{ subdomains:'abcd', maxZoom:19, attribution: OSM + ' &copy; <a href="https://carto.com/">CARTO</a>' } },
   { url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png', opt:{ maxZoom:19, attribution: OSM }, dim:true },
   { url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', opt:{ maxZoom:19, attribution:'Tiles &copy; Esri' }, dim:true }
 ];
