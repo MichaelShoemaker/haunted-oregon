@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Haunted Oregon, Illinois</title>
+<meta name="description" content="An interactive map of the ghost stories, haunted legends and dark history of Oregon, Illinois — the Gem of the Rock River Valley.">
+<meta property="og:title" content="Haunted Oregon, Illinois">
+<meta property="og:description" content="Ghost stories and haunted legends of Oregon, IL, pinned on a map.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👻</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=IM+Fell+English:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root{
+    --bg:#0b0a0f;
+    --panel:#14121b;
+    --panel-2:#1c1926;
+    --ink:#ece6d8;
+    --muted:#a39d91;
+    --line:#2c2838;
+    --accent:#ff7a1a;
+    --accent-2:#b6f36a;
+    --blood:#c2263b;
+    --glow:rgba(255,122,26,.35);
+    --sidebar:380px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif}
+  body{display:flex;flex-direction:column;overflow:hidden}
+
+  header{
+    padding:14px 20px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#1a1022 0%,var(--bg) 100%);
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  }
+  header h1{
+    font-family:Creepster,cursive;font-weight:400;letter-spacing:2px;
+    margin:0;font-size:clamp(26px,4vw,40px);color:var(--accent);
+    text-shadow:0 0 18px var(--glow);
+  }
+  header p{margin:0;color:var(--muted);font-family:"IM Fell English",serif;font-style:italic;font-size:15px}
+  .head-actions{margin-left:auto;display:flex;gap:8px}
+  .btn{
+    background:var(--panel-2);color:var(--ink);border:1px solid var(--line);
+    padding:8px 12px;border-radius:8px;font:500 13px Inter,sans-serif;cursor:pointer;
+  }
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+
+  main{flex:1;display:flex;min-height:0}
+  aside{
+    width:var(--sidebar);flex:none;background:var(--panel);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;min-height:0;
+  }
+  .filters{display:flex;gap:6px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .chip{
+    background:transparent;border:1px solid var(--line);color:var(--muted);
+    padding:5px 10px;border-radius:999px;font:500 12px Inter,sans-serif;cursor:pointer;
+  }
+  .chip.active{background:var(--accent);border-color:var(--accent);color:#1a0d02}
+  .list{overflow-y:auto;flex:1}
+  .item{
+    display:flex;gap:12px;padding:14px;border-bottom:1px solid var(--line);cursor:pointer;
+    transition:background .15s;
+  }
+  .item:hover,.item.active{background:var(--panel-2)}
+  .item.active{box-shadow:inset 3px 0 0 var(--accent)}
+  .num{
+    flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
+    background:#241c12;color:var(--accent);font:600 13px Inter,sans-serif;border:1px solid #4a3216;
+  }
+  .item h3{margin:0 0 3px;font-size:15px;font-weight:600}
+  .item .tag{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent-2)}
+  .item p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.4}
+
+  #map{flex:1;min-width:0;background:#08070b}
+
+  /* story drawer */
+  #story{
+    position:absolute;z-index:1000;right:16px;top:16px;bottom:16px;width:min(440px,calc(100% - 32px));
+    background:rgba(20,18,27,.97);border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 40px rgba(255,122,26,.08);
+    display:none;flex-direction:column;overflow:hidden;
+  }
+  #story.open{display:flex}
+  .story-head{padding:18px 20px 12px;border-bottom:1px solid var(--line);position:relative}
+  .story-head .tag{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent-2)}
+  .story-head h2{font-family:Creepster,cursive;font-weight:400;font-size:30px;margin:6px 0 4px;color:var(--accent);letter-spacing:1px}
+  .story-head .addr{color:var(--muted);font-size:13px}
+  .close{position:absolute;right:12px;top:12px;background:none;border:0;color:var(--muted);font-size:24px;cursor:pointer;line-height:1}
+  .close:hover{color:var(--accent)}
+  .story-body{padding:16px 20px 22px;overflow-y:auto;font-family:"IM Fell English",serif;font-size:17px;line-height:1.6}
+  .story-body h4{font-family:Inter,sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:18px 0 6px}
+  .story-body ul{padding-left:18px;margin:6px 0}
+  .story-body li{margin:4px 0}
+  .note{font-family:Inter,sans-serif;font-size:12.5px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:14px;line-height:1.5}
+  .note.warn{border-color:#5a2230;color:#e6b7bf}
+  .story-body a{color:var(--accent)}
+  .src a{display:block;font-family:Inter,sans-serif;font-size:13px;margin:3px 0;word-break:break-word}
+  .nav{display:flex;justify-content:space-between;gap:8px;padding:12px 20px;border-top:1px solid var(--line)}
+
+  /* markers */
+  .ghost-pin{position:relative;width:38px;height:38px}
+  .ghost-pin .dot{
+    position:absolute;inset:4px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+    background:var(--accent);border:2px solid #1a0d02;box-shadow:0 0 14px var(--glow);
+  }
+  .ghost-pin.history .dot{background:var(--blood);box-shadow:0 0 14px rgba(194,38,59,.5)}
+  .ghost-pin.approx .dot{border-style:dashed;border-color:#fff;opacity:.85}
+  .ghost-pin span{position:absolute;inset:0;display:grid;place-items:center;font:700 13px Inter,sans-serif;color:#120802;transform:translateY(-2px)}
+  .ghost-pin.history span{color:#fff}
+  .ghost-pin.sel .dot{background:var(--accent-2);box-shadow:0 0 22px rgba(182,243,106,.7)}
+  .ghost-pin.sel span{color:#0b1402}
+
+  .leaflet-tooltip.spooky{background:#14121b;color:var(--ink);border:1px solid var(--line);font:500 12px Inter,sans-serif}
+  .leaflet-tooltip.spooky:before{border-top-color:#14121b}
+  .leaflet-container{font-family:Inter,sans-serif}
+  .leaflet-control-attribution{background:rgba(11,10,15,.75)!important;color:var(--muted)!important}
+  .leaflet-control-attribution a{color:var(--accent)!important}
+
+  .legend{
+    position:absolute;z-index:900;left:12px;bottom:28px;background:rgba(20,18,27,.92);border:1px solid var(--line);
+    border-radius:10px;padding:10px 12px;font-size:12px;color:var(--muted);line-height:1.8
+  }
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:7px;vertical-align:-1px}
+  .map-wrap{position:relative;flex:1;display:flex;min-width:0}
+
+  footer{padding:8px 16px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted);text-align:center}
+
+  @media (max-width: 820px){
+    main{flex-direction:column-reverse}
+    aside{width:100%;height:42%;border-right:0;border-top:1px solid var(--line)}
+    .map-wrap{flex:1;min-height:0}
+    #story{top:auto;bottom:0;right:0;left:0;width:100%;max-height:78%;border-radius:14px 14px 0 0}
+    .legend{display:none}
+    header{padding:10px 16px}
+    header p{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Haunted Oregon, IL</h1>
+  <p>Ghost stories &amp; dark legends of the Gem of the Rock River Valley</p>
+  <div class="head-actions">
+    <button class="btn" id="tourBtn">▶ Ghost Tour</button>
+    <button class="btn" id="resetBtn">Reset map</button>
+  </div>
+</header>
+
+<main>
+  <aside>
+    <div class="filters" id="filters">
+      <button class="chip active" data-f="all">All</button>
+      <button class="chip" data-f="haunting">Hauntings</button>
+      <button class="chip" data-f="legend">Legends</button>
+      <button class="chip" data-f="history">Dark history</button>
+    </div>
+    <div class="list" id="list"></div>
+  </aside>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="legend">
+      <div><i style="background:var(--accent)"></i>Haunting / legend</div>
+      <div><i style="background:var(--blood)"></i>Dark history</div>
+      <div><i style="border:2px dashed #fff"></i>Approximate spot</div>
+    </div>
+
+    <section id="story" aria-live="polite">
+      <div class="story-head">
+        <button class="close" id="closeStory" aria-label="Close">×</button>
+        <div class="tag" id="sTag"></div>
+        <h2 id="sTitle"></h2>
+        <div class="addr" id="sAddr"></div>
+      </div>
+      <div class="story-body" id="sBody"></div>
+      <div class="nav">
+        <button class="btn" id="prevBtn">← Previous</button>
+        <button class="btn" id="nextBtn">Next →</button>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>Folklore is folklore — many stories here are unverified local legend. Visit businesses during open hours, respect private property, and never trespass at night.</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* ---------------------------------------------------------------
+   LOCATIONS — edit, add or remove entries here.
+   type: "haunting" | "legend" | "history"
+   approx: true draws a dashed pin (exact spot not confirmed)
+---------------------------------------------------------------- */
+const PLACES = [
+  {
+    id: "roadhouse",
+    name: "The Road House",
+    type: "haunting",
+    tag: "Most famous haunting",
+    addr: "807 S. 7th St. (Rt. 2 & Pines Rd.)",
+    lat: 42.0046, lng: -89.3372,
+    teaser: "The last place Mary Jane Reed was seen alive in 1948 — and, some say, where she never left.",
+    story: `
+      <p>On the night of June 25, 1948, seventeen-year-old telephone operator <b>Mary Jane Reed</b> and her date, <b>Stanley Skridla</b>, were last seen at this roadside tavern — then called <i>the Stenhouse</i>. Both were later found shot to death outside of town. More than seventy-five years on, the double murder has never been solved.</p>
+      <p>The building is far older than the crime. It likely dates to the 1800s, served as a general store and café, and local lore ties it to Prohibition-era bootlegging and even visits from Al Capone's crowd.</p>
+      <h4>What people report</h4>
+      <ul>
+        <li>When new owners were renovating the run-down building in the 1990s, a young woman reportedly appeared twice, remarked how nice it would look once it was finished — and vanished.</li>
+        <li>A jukebox that played on its own after midnight, cutting off mid-song.</li>
+        <li>Staff who refused to close alone, utensils flung across the kitchen, and a woman seen gliding through the dining room.</li>
+        <li>A table in the north dining room — said to be the old basement poker table Skridla played at the night he died — is one of the building's "hot spots."</li>
+      </ul>
+      <p>The story was featured on Travel Channel's <i>The Dead Files</i> and the series <i>Expedition Entity</i>.</p>
+      <div class="note">Still an operating restaurant with history dinners and tours — call ahead for hours.</div>`,
+    sources: [
+      ["WROK: A murder victim's ghost haunts this restaurant", "https://1440wrok.com/a-murder-victims-ghost-haunts-this-restaurant-in-oregon-illinois/"],
+      ["Only In Your State: Most haunted restaurant in Illinois", "https://www.onlyinyourstate.com/illinois/haunted-restaurant-il/"],
+      ["Higgypop: Expedition Entity at The Road House", "https://higgypop.com/news/expedition-entity-investigates-al-capone-hangout"],
+      ["Travel Channel: The Dead Files — The Obsession", "https://travelchannel.com/shows/the-dead-files/photos/the-obsession-pictures"]
+    ]
+  },
+  {
+    id: "conover",
+    name: "Conover Square",
+    type: "haunting",
+    tag: "Haunted piano factory",
+    addr: "N. 3rd St., downtown Oregon",
+    lat: 42.0163, lng: -89.3313,
+    teaser: "An 1890s piano factory turned antique mall, with a giggling girl and crashes from an empty third floor.",
+    story: `
+      <p>Built in the 1890s as a piano factory, Conover Square is now a mall of shops and a museum — and Oregon's best-known haunted building. It even serves as home base for a local paranormal research group.</p>
+      <h4>What people report</h4>
+      <ul>
+        <li>The laughter of a little girl echoing through the hallways and museum.</li>
+        <li>Loud booms and crashes from the third floor — which sits empty and unused.</li>
+        <li>Women visitors who say they felt something touch them in the basement.</li>
+        <li>A man seen — and heard laughing — in the south hallway.</li>
+        <li>Investigators describe a Halloween night in the attic when a box of staples dropped, then something metal seemed to be thrown <i>toward</i> them — what they called poltergeist activity.</li>
+      </ul>
+      <div class="note">Shops are open to the public; ghost hunts have been offered by appointment.</div>`,
+    sources: [
+      ["WROK: Haunted piano factory near Rockford", "https://1440wrok.com/check-out-this-haunted-piano-factory-just-45-minutes-from-rockford/"],
+      ["HauntedPlaces.org: Oregon, IL", "https://www.hauntedplaces.org/oregon-il/"],
+      ["Shaw Local: Rock River Area Paranormal Society", "https://www.shawlocal.com/2020/10/21/rock-river-area-paranormal-society-investigates-ogle-county-hauntings/a4edgu5/"]
+    ]
+  },
+  {
+    id: "library",
+    name: "Oregon Public Library",
+    type: "haunting",
+    tag: "Haunted since 1909",
+    addr: "300 Jefferson St.",
+    lat: 42.0151, lng: -89.3327,
+    teaser: "Phantom footsteps, voices, shadow figures — and an electric surge in the children's room.",
+    story: `
+      <p>The library opened its doors in 1909, and for many years it has carried a reputation for being haunted.</p>
+      <h4>What people report</h4>
+      <ul>
+        <li>Phantom footsteps, disembodied voices and shadowy figures moving in the dark.</li>
+        <li>Three investigators entering the basement children's area all felt what they described as a massive surge of electricity — every hair on their arms standing up. It never happened again.</li>
+        <li>With the team split between the basement and the upstairs art gallery, those below heard what sounded like a huge crash on the empty first floor.</li>
+      </ul>
+      <p>The library was the subject of an episode of the paranormal series <i>Expedition Entity</i>.</p>
+      <div class="note">A working public library — please be respectful of patrons and staff.</div>`,
+    sources: [
+      ["Ogle County Life: The most haunted places in Ogle County", "https://oglecountylife.com/stories/the-most-haunted-places-in-ogle-county,19035"],
+      ["TheTVDB: Expedition Entity episodes", "https://thetvdb.com/series/expedition-entity/allseasons/official"]
+    ]
+  },
+  {
+    id: "courthouse",
+    name: "Ogle County Courthouse",
+    type: "history",
+    tag: "Fire, bandits & vigilantes",
+    addr: "Courthouse Square (4th & Washington)",
+    lat: 42.0139, lng: -89.3333,
+    teaser: "The town's first courthouse was torched by the 'Prairie Bandits' the night before court.",
+    story: `
+      <p>Oregon's first courthouse never held a single trial. On <b>March 21, 1841</b>, with several members of the outlaw gang known as the <b>Banditti of the Prairie</b> locked in the jail nearby, fire broke out in the brand-new building the night before court was to convene. It burned to the ground — and it was widely believed the gang set it to help their friends escape.</p>
+      <p>The fire set off one of the darkest chapters in Ogle County history: citizens formed vigilante "Regulator" companies, and the violence ended months later in a mob execution (see the Driscoll site on this map).</p>
+      <p>Today's Romanesque Revival courthouse was completed in 1891. A paranormal team investigated it in 2018 and reported capturing figure-like shapes on a motion-tracking camera upstairs, in the kitchen and in the basement.</p>`,
+    sources: [
+      ["Wikipedia: Ogle County Courthouse", "https://en.wikipedia.org/wiki/Ogle_County_Courthouse"],
+      ["NIU: The Regulators and the Prairie Bandits", "https://ipo.lib.niu.edu/2002/ih020506.html"],
+      ["Ogle County Life: The most haunted places in Ogle County", "https://oglecountylife.com/stories/the-most-haunted-places-in-ogle-county,19035"]
+    ]
+  },
+  {
+    id: "blackhawk",
+    name: "Black Hawk Statue",
+    type: "legend",
+    tag: "The Eternal Indian",
+    addr: "Lowden State Park, 1411 N. River Rd.",
+    lat: 42.0372, lng: -89.3262,
+    teaser: "A 48-foot concrete figure that seems to come alive at sunset over the Rock River.",
+    story: `
+      <p>High on the east bluff, Lorado Taft's <b>Eternal Indian</b> — known to everyone as <i>Black Hawk</i> — has gazed over the Rock River since 1911. Taft intended it as a tribute to all Native Americans, but it became tied to the Sauk leader Black Hawk.</p>
+      <p>Local legend holds that as Black Hawk left the valley after the Black Hawk War, he spoke of its beauty and charged his captors to care for the land as his people had. Taft is said to have conceived the figure while he and his fellow artists stood on these bluffs with folded arms, watching the river at dusk.</p>
+      <h4>Why it feels haunted</h4>
+      <ul>
+        <li>The statue is hollow, with a door at its base that only park staff may enter.</li>
+        <li>Visitors describe the face seeming to change and come alive as the sun sets behind it.</li>
+        <li>Paranormal investigators have suggested the area's river, limestone bluffs and Native history may be why Oregon has so many stories.</li>
+      </ul>
+      <div class="note">Best view at sunset from IL Rt. 2 across the river. The statue has undergone long restoration work — check with the park before visiting.</div>`,
+    sources: [
+      ["Illinois DNR: Lowden State Park", "https://dnr.illinois.gov/parks/park.lowden.html"],
+      ["Wikipedia: Black Hawk Statue", "https://en.wikipedia.org/wiki/Black_Hawk_Statue"],
+      ["City of Oregon: Blackhawk Statue", "https://oregonil.gov/?p=1391"]
+    ]
+  },
+  {
+    id: "taft",
+    name: "Lorado Taft Campus",
+    type: "haunting",
+    tag: "Eagle's Nest Art Colony",
+    addr: "1414 N. River Rd.",
+    lat: 42.0326, lng: -89.3236,
+    teaser: "Woods and ravines where an artists' colony gathered for 44 summers.",
+    story: `
+      <p>In 1898 sculptor Lorado Taft and a circle of artists and scholars began summering on these wooded bluffs, founding the <b>Eagle's Nest Art Colony</b>. It thrived until its last original member died in 1942. Northern Illinois University later took over part of the estate, and three original colony buildings still stand.</p>
+      <p>The campus is one of the locations investigated by the Rock River Area Paranormal Society — people who stay in the old buildings say the colony never quite left.</p>
+      <div class="note">An active NIU outdoor education center; access is for program participants.</div>`,
+    sources: [
+      ["NIU: About the Lorado Taft Field Campus", "https://niu.edu/taft/about/index.shtml"],
+      ["Shaw Local: Rock River Area Paranormal Society", "https://www.shawlocal.com/2020/10/21/rock-river-area-paranormal-society-investigates-ogle-county-hauntings/a4edgu5/"]
+    ]
+  },
+  {
+    id: "stronghold",
+    name: "Stronghold Castle",
+    type: "legend",
+    tag: "Castle with secret passages",
+    addr: "1922 N. IL Rt. 2",
+    lat: 42.0545, lng: -89.3388,
+    teaser: "A 1920s castle with four secret passages — its builder lived to enjoy just one summer.",
+    story: `
+      <p>On a bluff two miles north of town stands a genuine castle. <b>Walter Strong</b>, publisher of the <i>Chicago Daily News</i>, built it as a summer retreat beginning in 1928: sixteen bedrooms, eight fireplaces, a soaring Great Hall — and <b>four secret passages</b>.</p>
+      <p>Strong enjoyed only a single summer here before dying in 1931 at age 47. His widow kept the castle for three more decades before it became a Presbyterian camp and retreat center.</p>
+      <p>A builder who barely got to live in his dream house, hidden passages, a stone tower over the river — it's no surprise the castle draws ghost hunters. Local investigators have explored it, and it has hosted Halloween paranormal events and murder-mystery dinners.</p>
+      <div class="note">A private retreat center — visit during public events only.</div>`,
+    sources: [
+      ["City of Oregon: Stronghold Castle", "https://oregonil.gov/?p=428"],
+      ["Wikipedia: Stronghold Center", "https://en.wikipedia.org/wiki/Stronghold_Center"],
+      ["Shaw Local: Rock River Area Paranormal Society", "https://www.shawlocal.com/2020/10/21/rock-river-area-paranormal-society-investigates-ogle-county-hauntings/a4edgu5/"]
+    ]
+  },
+  {
+    id: "maxson",
+    name: "Maxson's Riverboat & Restaurant",
+    type: "haunting",
+    tag: "On the Rock River",
+    addr: "IL Rt. 2 north of Oregon",
+    lat: 42.0298, lng: -89.3378,
+    approx: true,
+    teaser: "A riverside landmark on the paranormal investigators' list.",
+    story: `
+      <p>Maxson's riverside restaurant and riverboat sit on the Rock River just north of downtown. It's one of the local spots investigated by the Rock River Area Paranormal Society, whose members say Oregon has an unusually high concentration of haunted places — and wonder if the river itself has something to do with it.</p>
+      <div class="note">Pin location is approximate.</div>`,
+    sources: [
+      ["Shaw Local: Rock River Area Paranormal Society", "https://www.shawlocal.com/2020/10/21/rock-river-area-paranormal-society-investigates-ogle-county-hauntings/a4edgu5/"]
+    ]
+  },
+  {
+    id: "driscoll",
+    name: "Driscoll Execution Site",
+    type: "history",
+    tag: "Mob trial of 1841",
+    addr: "Washington Grove, off Prairie Rd. (southeast of Oregon)",
+    lat: 41.9905, lng: -89.2280,
+    approx: true,
+    teaser: "Where 111 vigilantes executed a father and son in June 1841.",
+    story: `
+      <p>After the courthouse fire, the Regulators ordered suspected bandits to leave the county. The <b>Driscoll family</b> — father John and his sons — refused, and on June 27, 1841, Regulator captain John Campbell was shot dead near his home.</p>
+      <p>Two days later, the Regulators dragged John Driscoll out of the Oregon jail over the protests of the judge and sheriff. At Washington Grove, a crowd of hundreds held a "trial," and a firing squad of 111 men executed John and his son William. The men were later tried for murder — and acquitted.</p>
+      <p>A granite boulder marks where the Driscolls died. It's one of the grimmest places in northern Illinois, and the kind of spot where legends take root.</p>
+      <div class="note warn">This is real history, not a ghost story. Pin location is approximate — the boulder is in a rural area; stay on public roads.</div>`,
+    sources: [
+      ["Lynching Markers (JMU): Mob Trial and Execution marker", "https://sites.lib.jmu.edu/lynchingmarkers/?p=2262"],
+      ["HMdb: The Regulators and the Banditti", "https://www.hmdb.org/m.asp?m=308296"],
+      ["Wikipedia: Banditti of the Prairie", "https://en.wikipedia.org/wiki/Banditti_of_the_Prairie"]
+    ]
+  },
+  {
+    id: "kennedyhill",
+    name: "Phantom Lady of Kennedy Hill Road",
+    type: "legend",
+    tag: "The lady on the hill",
+    addr: "Kennedy Hill Rd., off IL Rt. 2 between Oregon and Byron",
+    lat: 42.0900, lng: -89.3000,
+    approx: true,
+    teaser: "In the winter of 1980–81, dozens of drivers saw a young woman walking the road in the freezing cold — then she was gone.",
+    story: `
+      <p>From about mid-December 1980 into mid-January 1981, drivers on <b>Kennedy Hill Road</b>, a country road off Route 2 on the way to Byron, started reporting the same thing. A young woman, often described with long blonde hair, was walking along the road at night. She was badly underdressed for the bitter cold and sometimes barefoot.</p>
+      <p>Each time someone pulled over to help, <b>she had vanished</b>.</p>
+      <h4>What people reported</h4>
+      <ul>
+        <li>Dozens of sightings, collected by a Rockford <i>Register Star</i> reporter who found the witnesses believable.</li>
+        <li>One pair of men described a woman jogging south in almost nothing but a black scarf, in January.</li>
+        <li>Vanishing-hitchhiker tales: people said they gave a girl a ride home, she disappeared from the car, and her mother told them she had died years before.</li>
+        <li>At the height of the craze, carloads of curious people jammed the road on freezing nights, and deputies arrested some for blocking driveways. Nobody ever found her.</li>
+      </ul>
+      <h4>Who was she?</h4>
+      <ul>
+        <li>Local teens said she was the ghost of a woman whose small country cemetery had been plowed under.</li>
+        <li>The <i>Chicago Tribune</i> floated a sad, real-world explanation: a missing girl from Oregon. But it seemed unlikely anyone could survive a month outdoors that winter.</li>
+        <li>Others suspected a prank, maybe even a man in disguise.</li>
+      </ul>
+      <p>After January 1981 she was never seen again. Ghost researchers who checked the road a decade later found nothing, but anyone who grew up around Oregon still knows the story.</p>
+      <div class="note warn">Pin location is approximate. Kennedy Hill Road is a rural road lined with private homes. Don't park in driveways or block traffic.</div>`,
+    sources: [
+      ["Michael Kleen: The Phantom Lady of Kennedy Hill Road", "https://michaelkleen.com/2018/12/25/the-phantom-lady-of-kennedy-hill-road-2/"],
+      ["WROK: The Phantom Woman of Kennedy Hill Road", "https://1440wrok.com/the-phantom-woman-of-kennedy-hill-road/"]
+    ]
+  }
+];
+
+/* ---------------- map ---------------- */
+const CENTER = [42.022, -89.318];
+const map = L.map('map', { zoomControl: true, scrollWheelZoom: true }).setView(CENTER, 13);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
+const markers = {};
+let current = -1;
+let filter = 'all';
+let tourTimer = null;
+
+function iconFor(p, i, selected){
+  const cls = ['ghost-pin', p.type === 'history' ? 'history' : '', p.approx ? 'approx' : '', selected ? 'sel' : ''].join(' ');
+  return L.divIcon({ className:'', html:`<div class="${cls}"><div class="dot"></div><span>${i+1}</span></div>`, iconSize:[38,38], iconAnchor:[19,36] });
+}
+
+PLACES.forEach((p, i) => {
+  const m = L.marker([p.lat, p.lng], { icon: iconFor(p, i, false), title: p.name })
+    .bindTooltip(p.name, { className:'spooky', direction:'top', offset:[0,-32] })
+    .on('click', () => open(i));
+  m.addTo(map);
+  markers[p.id] = m;
+});
+
+function fitAll(){
+  const vis = visible().map(p => [p.lat, p.lng]);
+  if (vis.length) map.fitBounds(vis, { padding:[50,50], maxZoom:15 });
+}
+
+/* ---------------- list ---------------- */
+const listEl = document.getElementById('list');
+const typeLabel = { haunting:'Haunting', legend:'Legend', history:'Dark history' };
+
+function visible(){ return PLACES.filter(p => filter === 'all' || p.type === filter); }
+
+function renderList(){
+  listEl.innerHTML = '';
+  PLACES.forEach((p, i) => {
+    const show = filter === 'all' || p.type === filter;
+    const m = markers[p.id];
+    if (show) { if (!map.hasLayer(m)) m.addTo(map); } else { map.removeLayer(m); }
+    if (!show) return;
+    const el = document.createElement('div');
+    el.className = 'item' + (i === current ? ' active' : '');
+    el.innerHTML = `<div class="num">${i+1}</div><div><div class="tag">${typeLabel[p.type]}${p.approx ? ' · approx.' : ''}</div><h3>${p.name}</h3><p>${p.teaser}</p></div>`;
+    el.onclick = () => open(i);
+    listEl.appendChild(el);
+  });
+}
+
+document.getElementById('filters').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c === b));
+  filter = b.dataset.f;
+  renderList(); fitAll();
+});
+
+/* ---------------- story panel ---------------- */
+const storyEl = document.getElementById('story');
+function open(i){
+  if (current >= 0) markers[PLACES[current].id].setIcon(iconFor(PLACES[current], current, false));
+  current = i;
+  const p = PLACES[i];
+  markers[p.id].setIcon(iconFor(p, i, true));
+  document.getElementById('sTag').textContent = `#${i+1} · ${typeLabel[p.type]} · ${p.tag}`;
+  document.getElementById('sTitle').textContent = p.name;
+  document.getElementById('sAddr').textContent = p.addr;
+  const src = p.sources.map(([t,u]) => `<a href="${u}" target="_blank" rel="noopener">${t}</a>`).join('');
+  const dir = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
+  document.getElementById('sBody').innerHTML =
+    p.story + `<h4>Get there</h4><div class="src"><a href="${dir}" target="_blank" rel="noopener">Directions in Google Maps ↗</a></div><h4>Sources</h4><div class="src">${src}</div>`;
+  document.getElementById('sBody').scrollTop = 0;
+  storyEl.classList.add('open');
+  const narrow = window.innerWidth <= 820;
+  map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 15), { duration: .8 });
+  if (!narrow) setTimeout(() => map.panBy([-200, 0], { animate:true }), 850);
+  renderList();
+  const active = listEl.querySelector('.item.active');
+  if (active) active.scrollIntoView({ block:'nearest', behavior:'smooth' });
+}
+function step(d){
+  const vis = visible(); if (!vis.length) return;
+  let idx = vis.indexOf(PLACES[current]);
+  idx = (idx + d + vis.length) % vis.length;
+  open(PLACES.indexOf(vis[idx]));
+}
+function closeStory(){
+  storyEl.classList.remove('open');
+  if (current >= 0) markers[PLACES[current].id].setIcon(iconFor(PLACES[current], current, false));
+  current = -1; stopTour(); renderList();
+}
+document.getElementById('closeStory').onclick = closeStory;
+document.getElementById('prevBtn').onclick = () => { stopTour(); step(-1); };
+document.getElementById('nextBtn').onclick = () => { stopTour(); step(1); };
+document.getElementById('resetBtn').onclick = () => { closeStory(); fitAll(); };
+document.addEventListener('keydown', e => {
+  if (!storyEl.classList.contains('open')) return;
+  if (e.key === 'Escape') closeStory();
+  if (e.key === 'ArrowRight') { stopTour(); step(1); }
+  if (e.key === 'ArrowLeft') { stopTour(); step(-1); }
+});
+
+/* ---------------- auto tour ---------------- */
+const tourBtn = document.getElementById('tourBtn');
+function stopTour(){ clearInterval(tourTimer); tourTimer = null; tourBtn.textContent = '▶ Ghost Tour'; }
+tourBtn.onclick = () => {
+  if (tourTimer) return stopTour();
+  tourBtn.textContent = '■ Stop tour';
+  const vis = visible();
+  open(PLACES.indexOf(vis[0]));
+  tourTimer = setInterval(() => step(1), 9000);
+};
+
+renderList();
+fitAll();
+</script>
+</body>
+</html>
